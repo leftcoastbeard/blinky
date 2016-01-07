@@ -1,0 +1,25 @@
+{
+  "name": "mbed-hal-st-stm32cubef4",
+  "version": "1.0.2",
+  "description": "STM32Cube HAL for STM32F4 microcontrollers",
+  "keywords": [
+    "mbed",
+    "mbed-official"
+  ],
+  "author": "",
+  "homepage": "https://github.com/ARMmbed/mbed-hal-st-stm32cubef4",
+  "licenses": [
+    {
+      "url": "https://spdx.org/licenses/BSD-3-Clause",
+      "type": "BSD-3-Clause"
+    }
+  ],
+  "extraIncludes": [
+    "mbed-hal-st-stm32cubef4"
+  ],
+  "dependencies": {
+    "uvisor-lib": "^1.0.0",
+    "mbed-hal-st-stm32f4": "^1.0.0"
+  },
+  "targetDependencies": {}
+}
