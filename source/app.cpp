@@ -7,5 +7,5 @@ static void blinky(void) {
 }
 
 void app_start(int, char**){
- minar::Scheduler::postCallback(blinky).period(minar::milliseconds(500));
+ minar::Scheduler::postCallback(blinky).period(minar::milliseconds(333));
 }
