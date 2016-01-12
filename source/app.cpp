@@ -6,7 +6,7 @@
 
 using namespace mbed::util;
 
-Sample<int> MySamples(5);
+Sample<float> MySamples(5);
 Control MyControl(0.5f);
 DigitalOut MyLED(LED1);
 AnalogIn Pot0(A0);

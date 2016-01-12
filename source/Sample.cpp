@@ -7,41 +7,39 @@
 
 #include "Sample.h"
 
-template <typename T>
-Sample<T>::Sample(unsigned mnos) {
-    max_samples = (unsigned int) mnos;
+template <class a_T>
+Sample<a_T>::Sample(unsigned int mnos) {
+    max_samples = mnos;
     sample_index = 0;
-    samples = new T[mnos];
-#if __cplusplus == 201103L
-    for(int i: samples) samples[i]=0;
-#else
-    for(int i=0; i<max_samples; i++){
+    samples = new a_T[mnos];
+
+    for(unsigned int i=0; i<mnos; i++){
         samples[i]=0;
     }
-#endif
-    sum = (T)(0);
-    current = (T)(0);
-    average = (T)(0);
-    //calibrated = (T)(0);
+
+    sum = (a_T)(0);
+    current = (a_T)(0);
+    average = (a_T)(0);
+    //calibrated = (a_T)(0);
 }
 
-template <typename T>
-T Sample<T>::GetAverage(){
+template <class a_T>
+a_T Sample<a_T>::GetAverage(){
     return average;
 }
 
-template <typename T>
-T Sample<T>::GetCurrent(){
+template <class a_T>
+a_T Sample<a_T>::GetCurrent(){
     return current;
 }
 
-template <typename T>
-T Sample<T>::GetSum(){
+template <class a_T>
+a_T Sample<a_T>::GetSum(){
     return sum;
 }
 
-template <typename T>
-T Sample<T>::Update(T sample_data){
+template <class a_T>
+a_T Sample<a_T>::Update(a_T sample_data){
   current = sample_data;
   sum += current;
   sum -= samples[sample_index];
@@ -52,24 +50,10 @@ T Sample<T>::Update(T sample_data){
   return average;
 }
 
-//Float version, because Templates are not working properly...?
-template <>
-float Sample<float>::Update(float sample_data){
-  current = sample_data;
-  sum += current;
-  sum -= samples[sample_index];
-  samples[sample_index] = current;
-  average = sum/max_samples;
-  sample_index++;
-  if(sample_index == max_samples) sample_index = 0;
-  return average;
+template <class a_T>
+Sample<a_T>::~Sample() {
+    delete[] samples;
 }
 
-/*
-sample::sample(const sample& orig) {
-}*/
-template <typename T>
-Sample<T>::~Sample() {
-    delete samples;
-}
-
+template class Sample<int>;
+template class Sample<float>;

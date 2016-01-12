@@ -9,22 +9,22 @@
 #define SAMPLE_H
 #include "mbed-drivers/mbed.h"
 
-template <typename T>
+template <class a_T>
 class Sample {
 public:
     Sample(unsigned int mnos);
-    T Update(T sample_data);
-    T GetSum();
-    T GetCurrent();
-    T GetAverage();
+    a_T Update(a_T sample_data);
+    a_T GetSum();
+    a_T GetCurrent();
+    a_T GetAverage();
     //sample(const sample& orig);
     virtual ~Sample();
 private:
-    T sum;
-    T current;
-    T *samples;
-    T average;
-    //T calibrated;
+    a_T sum;
+    a_T current;
+    a_T *samples;
+    a_T average;
+    //a_T calibrated;
     unsigned int sample_index;
     unsigned int max_samples;
 };
