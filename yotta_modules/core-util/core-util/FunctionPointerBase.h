@@ -21,22 +21,27 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+#include "core-util/assert.h"
 namespace mbed {
 namespace util {
+
+#define MBED_STATIC_ASSERT(MBED_STATIC_ASSERT_FAILED,MSG)\
+    switch(0){\
+        case 0:case (MBED_STATIC_ASSERT_FAILED): \
+        break;}
+
+template<typename R>
+class FunctionPointerBind;
 
 template<typename R>
 class FunctionPointerBase {
 public:
-    operator bool(void) const {
+    inline operator bool(void) const {
         return (_membercaller != NULL) && (_object != NULL);
     }
 
     bool operator==(const FunctionPointerBase& other) const {
-        return ((_object == other._object) &&
-                (_member[0] == other._member[0]) &&
-                (_member[1] == other._member[1]) &&
-                (_member[2] == other._member[2]) &&
-                (_member[3] == other._member[3]));
+        return ((_object == other._object) && (memcmp(_member, other._member, sizeof(_member)) == 0));
     }
 
     /**
@@ -49,19 +54,18 @@ public:
         memset(_member, 0, sizeof(_member));
     }
 
-protected:
-    struct ArgOps {
-        void (*constructor)(void *, va_list);
-        void (*copy_args)(void *, void *);
-        void (*destructor)(void *);
-    };
-    void * _object; // object Pointer/function pointer
-    R (*_membercaller)(void *, uintptr_t *, void *);
-    // aligned raw member function pointer storage - converted back by registered _membercaller
-    uintptr_t _member[4];
-    static const struct ArgOps _nullops;
+    /**
+     * Calls the member pointed to by object::member or (function)object
+     * @param arg
+     * @return
+     */
+    inline R call(void* arg) {
+#ifndef YOTTA_CFG_UTIL_FUNCTIONPOINTER_DISABLE_NULL_CHECK
+        CORE_UTIL_ASSERT((_membercaller != NULL) && (_object != NULL));
+#endif
+        return _membercaller(_object, _member, arg);
+    }
 
-protected:
     FunctionPointerBase():_object(NULL), _membercaller(NULL) {
         memset(_member, 0, sizeof(_member));
     }
@@ -69,31 +73,56 @@ protected:
         copy(&fp);
     }
     virtual ~FunctionPointerBase() {
-    }
 
-    /**
-     * Calls the member pointed to by object::member or (function)object
-     * @param arg
-     * @return
-     */
-    inline R call(void* arg) {
-        return _membercaller(_object, _member, arg);
     }
+protected:
+    struct ArgOps {
+        void (*copy_args)(void *, void *);
+        void (*destructor)(void *);
+    };
+
+    // Forward declaration of an unknown class 
+    class UnknownClass;
+    // Forward declaration of an unknown member function to this an unknown class
+    // this kind of declaration is authorized by the standard (see 8.3.3/2 of C++ 03 standard).  
+    // As a result, the compiler will allocate for UnknownFunctionMember_t the biggest size 
+    // and biggest alignment possible for member function. 
+    // This type can be used inside unions, it will help to provide the storage 
+    // with the proper size and alignment guarantees 
+    typedef void (UnknownClass::*UnknownFunctionMember_t)();
+
+    union { 
+        char _member[sizeof(UnknownFunctionMember_t)];
+        UnknownFunctionMember_t _alignementAndSizeGuarantees;
+    };
+
+    void * _object; // object Pointer/function pointer
+    R (*_membercaller)(void *, char *, void *);
+    static const struct ArgOps _nullops;
+
+protected:
 
     void copy(const FunctionPointerBase<R> * fp) {
         _object = fp->_object;
         memcpy (_member, fp->_member, sizeof(_member));
         _membercaller = fp->_membercaller;
     }
+
+    template <typename S>
+    void * pre_bind(FunctionPointerBind<R> & fp, S * argStruct, const struct FunctionPointerBase<R>::ArgOps *ops)
+    {
+        MBED_STATIC_ASSERT(sizeof(S) <= sizeof(fp._storage), ERROR: Arguments too large for FunctionPointerBind internal storage)
+        (void) argStruct;
+        fp._ops = ops;
+        return (void*)fp._storage;
+    }
 private:
-    static void _null_constructor(void * dest, va_list args) {(void) dest;(void) args;}
     static void _null_copy_args(void *dest , void* src) {(void) dest; (void) src;}
     static void _null_destructor(void *args) {(void) args;}
 
 };
 template<typename R>
 const struct FunctionPointerBase<R>::ArgOps FunctionPointerBase<R>::_nullops = {
-    FunctionPointerBase<R>::_null_constructor,
     FunctionPointerBase<R>::_null_copy_args,
     FunctionPointerBase<R>::_null_destructor
 };
