@@ -12,12 +12,13 @@
 class Control {
 public:
     Control(float setpoint);
-    Control(const Control& orig);
+    //Control(const Control& orig);
     virtual ~Control();
-    float update(float input);
+    float Update(float input);
     //void update_isr(void);
     void setKonstants(float Kp, float Ki, float Kd);
     void setSetpoint(float setpoint);
+    float getSetpoint(void);
 #if __cplusplus == 201103L
     constexpr static const float dt= 0.001;
 #else

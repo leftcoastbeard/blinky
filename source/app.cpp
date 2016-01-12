@@ -6,7 +6,8 @@
 
 using namespace mbed::util;
 
-Sample<float> MySamples(5);
+Sample<float> P0Samples(5);
+Sample<float> P1Samples(5);
 Control MyControl(0.5f);
 DigitalOut MyLED(LED1);
 AnalogIn Pot0(A0);
@@ -34,9 +35,33 @@ static void pwm_toggle_irq(void){
 }
 
 static void l293d_event(void){
-    int p0 = (int)Pot0.read_u16();
-    int p1 = (int)Pot1.read_u16();
+    //int p0 = (int)Pot0.read_u16();
+    //int p1 = (int)Pot1.read_u16();
+    static Serial pc(USBTX,USBRX);
+    pc.printf("Current Setpoint: %1.3f", MyControl.getSetpoint());
+    MyControl.setSetpoint(P0Samples.Update(Pot0.read()));//update setpoint
+    pc.printf("New Setpoint: %1.3f", MyControl.getSetpoint());
     
+    float Correction = MyControl.Update(P1Samples.Update(Pot1.read()));//Update correction
+    pc.printf("Correction is: %1.3f", Correction);
+    
+    if((Correction <= 0.01)&&(Correction >= -0.01)){
+        Input1 =0; 
+        Input2 =0;
+        return;
+    }
+    if(Correction > 0.01){
+        Input1 = 1;
+        Input2 = 0;
+        return;
+    }
+    if (Correction < -0.01){
+        Input1 = 0;
+        Input2 = 1;
+        return;
+    }
+    
+    /*
     //Should be three cases
     
     //1. p0 > p1 - tolerance 
@@ -54,10 +79,12 @@ static void l293d_event(void){
     if((p0 > p1-Tol)&&(p0 < p1+Tol)){
         Input1 = 0;
         Input2 = 0;
-    }  
+    } 
+    */ 
 }
 
 void app_start(int, char**){
+    MyControl.setKonstants(0.001f,0.0f,0.0f);
     MyPwm.period_ms(1);
     static InterruptIn UserButton(USER_BUTTON);
     UserButton.rise(&pwm_toggle_irq);

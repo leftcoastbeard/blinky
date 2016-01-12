@@ -14,13 +14,13 @@ Control::Control(float setpoint) {
     this->setKonstants(0.0f,0.0f,0.0f);
 }
 
-Control::Control(const Control& orig) {
-}
+//Control::Control(const Control& orig) {
+//}
 
 Control::~Control() {
 }
 
-float Control::update(float input){
+float Control::Update(float input){
     error = setpoint-input;
     integral += error*dt;
     derivative = (error-prev_error)/dt;
@@ -36,6 +36,10 @@ void Control::setKonstants(float Kp, float Ki, float Kd){
 
 void Control::setSetpoint(float setpoint){
     this->setpoint = setpoint;
+}
+
+float Control::getSetpoint(void){
+    return this->setpoint;
 }
 
 /*void Control::update_isr(void){
