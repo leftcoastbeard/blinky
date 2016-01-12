@@ -1,15 +1,19 @@
 #include "mbed-drivers/mbed.h"
 #include "minar/minar.h"
 #include "core-util/FunctionPointer.h"
+#include "Sample.h"
+#include "Control.h"
 
 using namespace mbed::util;
 
-static DigitalOut MyLED(LED1);
-static AnalogIn Pot0(A0);
-static AnalogIn Pot1(A1);
-static DigitalOut Input1(D4);
-static DigitalOut Input2(D2);
-static PwmOut MyPwm(D5);
+Sample<int> MySamples(5);
+Control MyControl(0.5f);
+DigitalOut MyLED(LED1);
+AnalogIn Pot0(A0);
+AnalogIn Pot1(A1);
+DigitalOut Input1(D4);
+DigitalOut Input2(D2);
+PwmOut MyPwm(D5);
 //static float Tol = 0.05;
 unsigned int Tol = 0x0020;
 
@@ -54,9 +58,9 @@ static void l293d_event(void){
 }
 
 void app_start(int, char**){
-    MyPwm.period_ms(10);
+    MyPwm.period_ms(1);
     static InterruptIn UserButton(USER_BUTTON);
     UserButton.rise(&pwm_toggle_irq);
-    minar::Scheduler::postCallback(l293d_event).period(minar::milliseconds(50));
+    minar::Scheduler::postCallback(l293d_event).period(minar::milliseconds(10));
     minar::Scheduler::postCallback(blinky_event).period(minar::milliseconds(666));
 }
