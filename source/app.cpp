@@ -6,20 +6,22 @@
 
 using namespace mbed::util;
 
-Sample<float> P0Samples(5);
-Sample<float> P1Samples(5);
+Sample<float> P0Samples(100);
+Sample<float> P1Samples(100);
 Control MyControl(0.5f);
-DigitalOut MyLED(LED1);
+static DigitalOut MyLED(LED1);
 AnalogIn Pot0(A0);
 AnalogIn Pot1(A1);
-DigitalOut Input1(D4);
-DigitalOut Input2(D2);
+static DigitalOut Input1(D4);
+static DigitalOut Input2(D2);
 PwmOut MyPwm(D5);
+static Serial pc(USBTX,USBRX);
 //static float Tol = 0.05;
 unsigned int Tol = 0x0020;
 
 static void blinky_event(void) {
- MyLED = !MyLED;
+    MyLED = !MyLED;
+    pc.printf("                                                 \r");
 }
 
 static void pwm_toggle(void){
@@ -35,27 +37,28 @@ static void pwm_toggle_irq(void){
 }
 
 static void l293d_event(void){
-    //int p0 = (int)Pot0.read_u16();
-    //int p1 = (int)Pot1.read_u16();
-    static Serial pc(USBTX,USBRX);
-    pc.printf("Current Setpoint: %1.3f", MyControl.getSetpoint());
-    MyControl.setSetpoint(P0Samples.Update(Pot0.read()));//update setpoint
-    pc.printf("New Setpoint: %1.3f", MyControl.getSetpoint());
+    float p0 = Pot0.read();
+    float p1 = Pot1.read();
     
-    float Correction = MyControl.Update(P1Samples.Update(Pot1.read()));//Update correction
-    pc.printf("Correction is: %1.3f", Correction);
+    MyControl.setSetpoint(P0Samples.Update(p0));//update setpoint
+
+    float Correction = MyControl.Update(P1Samples.Update(p1));//Update correction
+    pc.printf("\t Correction: 0.%3d Setpoint: 0.%3d Input: 0.%3d \r", (int)(Correction*1000),(int)(p0*1000),(int)(p0*1000));
     
     if((Correction <= 0.01)&&(Correction >= -0.01)){
+        pc.printf("[..]\r");
         Input1 =0; 
         Input2 =0;
         return;
     }
     if(Correction > 0.01){
+        pc.printf("[.>>\r");
         Input1 = 1;
         Input2 = 0;
         return;
     }
     if (Correction < -0.01){
+        pc.printf("<<.]\r");
         Input1 = 0;
         Input2 = 1;
         return;
