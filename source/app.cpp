@@ -1,96 +1,168 @@
 #include "mbed-drivers/mbed.h"
 #include "minar/minar.h"
 #include "core-util/FunctionPointer.h"
-#include "Sample.h"
+//#include "Sample.h"
 #include "Control.h"
 
 using namespace mbed::util;
 
-Sample<float> P0Samples(100);
-Sample<float> P1Samples(100);
-Control MyControl(0.5f);
-static DigitalOut MyLED(LED1);
-AnalogIn Pot0(A0);
-AnalogIn Pot1(A1);
-static DigitalOut Input1(D4);
-static DigitalOut Input2(D2);
-PwmOut MyPwm(D5);
-static Serial pc(USBTX,USBRX);
-//static float Tol = 0.05;
-unsigned int Tol = 0x0020;
+/*******************************************************************/
+/* This does not function properly or compile properly as an 
+ * external file.
+ */
+template <class a_T = int, int max = 8 >
+class Sample
+{
+public:
+    Sample() {
+        max_samples = max;
+        sample_index = 0;
+        //samples = new a_T[MAX];
+
+        for (int i = 0; i < max; i++) {
+            samples[i] = 0;
+        }
+
+        sum = (a_T) (0);
+        current = (a_T) (0);
+        average = (a_T) (0);
+        //calibrated = (a_T)(0);
+    }
+    a_T Update(a_T sample_data) {
+        current = sample_data;
+        sum += current;
+        sum -= samples[sample_index];
+        samples[sample_index] = current;
+        average = sum / max_samples;
+        sample_index++;
+
+        if (sample_index == max_samples) sample_index = 0;
+
+        return average;
+    }
+    a_T GetSum() {
+        return sum;
+    }
+    a_T GetCurrent() {
+        return current;
+    }
+    a_T GetAverage() {
+        return average;
+    }
+    //sample(const sample& orig);
+    ~Sample() {}
+
+private:
+    a_T sum;
+    a_T current;
+    a_T samples[max];
+    a_T average;
+    //a_T calibrated;
+    unsigned int sample_index;
+    unsigned int max_samples;
+};
+/*******************************************************************/
+
+
+PwmOut L293D_Enable(D3);
+DigitalOut myled(LED1);
+Sample<float, 8> InputSamples;
+Sample<float, 32> KonstantSamples;
+Sample<float, 32> SetpointSamples;
+float input =0.0f, output=0.0f, setpoint=1.0f;
+Control MotorControl(&setpoint, &input, &output, 1.0f, 0.0f, 0.0f, DIRECT);
+AnalogIn InputPot(A0);
+AnalogIn SetpointPot(A1);
+AnalogIn KonstantPot(A2);
+DigitalOut L293D_Input1(D2);
+DigitalOut L293D_Input2(D4);
+Serial pc(USBTX,USBRX);
+InterruptIn UserButton(USER_BUTTON);
+//Ticker UpdateControl;
+//Ticker UpdateOutputs;
+//float Correction =0.0f;
+//It takes ~60% duty cycle to move the motor
+//So the PWM threshold should be 60% - the tolerance.
+static const float TOL = 0.010f;
+static const float PWM_THRESHOLD=0.600f-TOL;
+//static float pwm_state = 0.0f;
+int output_enable = 0;
 
 static void blinky_event(void) {
-    MyLED = !MyLED;
-    pc.printf("                                                 \r");
+    static float temp_setpoint = 0.0f;
+    static float temp_konstant = 0.0f;
+    temp_setpoint = SetpointPot.read();
+    SetpointSamples.Update(2.0f*temp_setpoint);
+    setpoint = SetpointSamples.GetAverage();//update setpoint
+
+    temp_konstant = KonstantPot.read();
+    KonstantSamples.Update(20.0f*temp_konstant);
+    MotorControl.setKonstants(KonstantSamples.GetAverage(),0.0f,0.0f);
+
+    pc.printf("\t Output: %1.3f Setpoint: %1.3f Input: %1.3f Konstant: %1.3f\r", output,SetpointSamples.GetAverage(),InputSamples.GetAverage(),KonstantSamples.GetAverage());
+        
+    myled = !myled;
+    //pc.printf("                                                 \r");
 }
 
-static void pwm_toggle(void){
-    if(MyPwm==0.0f){
-        MyPwm = 0.5f;
-    } else {
-        MyPwm = 0.0f;
-    }
+void enable_toggle(void)
+{
+    output_enable = output_enable?0:1;
+    wait_ms(10);
+}
+
+void pid_kompute_event(void){
+    input = InputSamples.GetAverage();
+    MotorControl.Kompute();
 }
 
 static void pwm_toggle_irq(void){
-    minar::Scheduler::postCallback(FunctionPointer0<void>(&pwm_toggle).bind());
+    minar::Scheduler::postCallback(FunctionPointer0<void>(&enable_toggle).bind());
 }
 
 static void l293d_event(void){
-    float p0 = Pot0.read();
-    float p1 = Pot1.read();
+    float temp_input = InputPot.read();
+    temp_input = InputSamples.Update(2.0f*temp_input);
     
-    MyControl.setSetpoint(P0Samples.Update(p0));//update setpoint
+    L293D_Enable =((float)output_enable)*((output>=0.0f?output:-output)+PWM_THRESHOLD);//TODO: Need a better function
 
-    float Correction = MyControl.Update(P1Samples.Update(p1));//Update correction
-    pc.printf("\t Correction: 0.%3d Setpoint: 0.%3d Input: 0.%3d \r", (int)(Correction*1000),(int)(p0*1000),(int)(p0*1000));
-    
-    if((Correction <= 0.01)&&(Correction >= -0.01)){
-        pc.printf("[..]\r");
-        Input1 =0; 
-        Input2 =0;
+    if((output <= TOL)&&(output >= -TOL)) {
+
+        L293D_Input1 =0;
+        L293D_Input2 =0;
         return;
     }
-    if(Correction > 0.01){
-        pc.printf("[.>>\r");
-        Input1 = 1;
-        Input2 = 0;
+    if(output < -TOL) {
+
+        L293D_Input1 = 1;
+        L293D_Input2 = 0;
         return;
     }
-    if (Correction < -0.01){
-        pc.printf("<<.]\r");
-        Input1 = 0;
-        Input2 = 1;
+    if (output > TOL) {
+
+        L293D_Input1 = 0;
+        L293D_Input2 = 1;
         return;
-    }
-    
-    /*
-    //Should be three cases
-    
-    //1. p0 > p1 - tolerance 
-    if(p0 > p1-Tol){
-        Input1 =1;
-        Input2 =0;
-    }
-    
-    //2. p0 is < p1 +/- tolerance 
-    if(p0 < p1+Tol){
-        Input1 = 0;
-        Input2 = 1;
-    }
-    //3. p0 is within +/- tolerance of p1
-    if((p0 > p1-Tol)&&(p0 < p1+Tol)){
-        Input1 = 0;
-        Input2 = 0;
     } 
-    */ 
 }
 
 void app_start(int, char**){
-    MyControl.setKonstants(0.001f,0.0f,0.0f);
-    MyPwm.period_ms(1);
-    static InterruptIn UserButton(USER_BUTTON);
+    //MotorControl.setKonstants(5.0f,1.0f,0.0f);
+    MotorControl.setLimits(-1.0f, 1.0f);
+    MotorControl.setMode(AUTOMATIC);
+    L293D_Enable.period_us(10);
+    //L293D_Input2.period_us(10);
+    L293D_Enable = PWM_THRESHOLD;
+    //L293D_Input2 = PWM_THRESHOLD;
+    //UserButton.rise(&enable_toggle);
+    //UpdateControl.attach(&pid_kompute_event, (float)(MotorControl.dt*MotorControl.getSamplePeriod()));
+    //UpdateOutputs.attach(&l293d_event, 0.001f);
+    
+    //MyControl.setKonstants(0.001f,0.0f,0.0f);
+    //L293D_Enable.period_ms(1);
+    //static InterruptIn UserButton(USER_BUTTON);
     UserButton.rise(&pwm_toggle_irq);
-    minar::Scheduler::postCallback(l293d_event).period(minar::milliseconds(10));
-    minar::Scheduler::postCallback(blinky_event).period(minar::milliseconds(666));
+    minar::Scheduler::postCallback(pid_kompute_event).period(minar::milliseconds(MotorControl.getSamplePeriod()));
+    minar::Scheduler::postCallback(l293d_event).period(minar::milliseconds(1));
+    minar::Scheduler::postCallback(blinky_event).period(minar::milliseconds(250));
 }

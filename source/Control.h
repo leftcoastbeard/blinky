@@ -1,4 +1,4 @@
-/* 
+/*
  * File:   Control.h
  * Author: C0320318
  *
@@ -7,34 +7,50 @@
 
 #ifndef CONTROL_H
 #define CONTROL_H
-#include "mbed-drivers/mbed.h"
+//#include "mbed-drivers/mbed.h"
 
-class Control {
+#define AUTOMATIC 1
+#define MANUAL 0
+#define DIRECT 0
+#define REVERSE 1
+
+class Control
+{
 public:
-    Control(float setpoint);
-    //Control(const Control& orig);
+
+    Control(float *setpoint, float *input, float *output, float kp, float ki, float kd, bool dir);
     virtual ~Control();
-    float Update(float input);
-    //void update_isr(void);
+    bool Kompute();
     void setKonstants(float Kp, float Ki, float Kd);
-    void setSetpoint(float setpoint);
-    float getSetpoint(void);
+    void setMode(bool mode);
+    void setLimits(float min, float max);
+    void setDirection(bool dir);
+    void updateSamplePeriod(int ms);
+
+    float getKP();
+    float getKI();
+    float getKD();
+    bool getMode();
+    bool getDirection();
+    unsigned long getSamplePeriod();
+
 #if __cplusplus == 201103L
     constexpr static const float dt= 0.001;
 #else
     static const float dt= 0.001;
 #endif
-    
+
 private:
-    
-    float setpoint;
-    float measured;
-    float integral;
-    float derivative;
-    float error;
-    float prev_error;
+    void Init();
+    float dispKp, dispKi, dispKd;
+    float *Setpoint,*Input, *Output;
     float Kp, Ki, Kd;
-    float input, output;
+    bool Direction;
+    unsigned long lastTime, samplePeriod;
+    float iTerm, lastInput;
+    float outMin, outMax;
+    bool isAuto;
+
 };
 
 #endif  /* CONTROL_H */
